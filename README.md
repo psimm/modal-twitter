@@ -1,6 +1,6 @@
 # Automated Twitter API Data Collector using Modal
 
-Please refer to the accompanying [blog post](https://simmering.dev/blog/twitter-modal/) for a motivation and explanation of the code.
+Please refer to the accompanying [blog post](https://simmering.dev/blog/modal-twitter/) for a motivation and explanation of the code.
 
 ## Installation
 
