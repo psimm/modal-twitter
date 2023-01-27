@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "modal-twitter"
+version = "0.1.0"
+description = "Download tweets from Twitter API and store it in S3. Run on Modal."
+authors = ["Paul Simmering <paul.simmering@gmail.com>"]
+readme = "README.md"
+packages = [{include = "modal_twitter"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+modal-client = "^0.45.872"
+python-twitter = "^3.5"
+boto3 = "^1.26.54"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
