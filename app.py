@@ -3,12 +3,16 @@ import twitter
 import os
 import boto3
 import json
+import tempfile
+import jsonlines
 from datetime import datetime
 
+# %%
 stub = modal.Stub(
-    image=modal.Image.debian_slim().pip_install(["boto3", "python-twitter"])
+    image=modal.Image.debian_slim().pip_install(["boto3", "python-twitter", "jsonlines"])
 )
 
+# %%
 @stub.function(secret=modal.Secret.from_name("twitter-api"))
 def get_tweets(term: str, count: int, since_id: str = None) -> list:
     # Authenticate with Twitter API
@@ -27,17 +31,22 @@ def get_tweets(term: str, count: int, since_id: str = None) -> list:
         result_type="recent",
     )
 
-
+# %%
 @stub.function(secret=modal.Secret.from_name("aws-s3-access"))
 def save_tweets(filename: str, tweets: list) -> str:
     tweets_dict_list = [t.AsDict() for t in tweets]
 
-    # Save JSON to S3
+    # Convert to JSONL and save to S3
     s3 = boto3.client("s3")
-    s3.put_object(
+
+    temp = tempfile.NamedTemporaryFile()
+    with jsonlines.open(temp.name, mode="w") as writer:
+        writer.write_all(tweets_dict_list)
+    
+    s3.upload_file(
+        Filename=temp.name,
         Bucket=os.environ["S3_BUCKET"],
-        Key=filename,
-        Body=json.dumps(tweets_dict_list),
+        Key=filename
     )
 
     print(f"Saved {len(tweets)} tweets to {filename} on S3")
@@ -57,10 +66,11 @@ def get_terms() -> list[dict]:
     terms = sorted(terms, key=lambda t: (t["timestamp_last_search"], t["since_id"]))
     return terms
 
-
+# %%
 @stub.function(secret=modal.Secret.from_name("aws-s3-access"))
 def save_terms(terms: list[dict]) -> None:
     s3 = boto3.client("s3")
+
     s3.put_object(
         Bucket=os.environ["S3_BUCKET"],
         Key="terms.json",
@@ -68,7 +78,7 @@ def save_terms(terms: list[dict]) -> None:
     )
     print("Updated terms.json on S3")
 
-
+# %%
 @stub.function(schedule=modal.Period(minutes=15))
 def main():
     terms = get_terms.call()
@@ -79,7 +89,7 @@ def main():
         print(f"Searching for term: {term['term']}")
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
-        filename = f"{timestamp} {term['term']}.json".replace(" ", "_")
+        filename = f"{timestamp} {term['term']}.jsonl".replace(" ", "_")
 
         try:
             tweets = get_tweets.call(term["term"], 100)  # maximum allowed by API
@@ -96,7 +106,7 @@ def main():
 
     save_terms.call(terms)
 
-
+# %%
 if __name__ == "__main__":
     with stub.run():
         main.call()
